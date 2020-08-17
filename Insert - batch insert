@@ -1,0 +1,140 @@
+ALTER PROC [dbo].[Subcontractors_Insert_v5]  --v5 for batch insert with licenseTypeId defined
+			     @BatchExpertise dbo.BatchSubcontractorExpertise READONLY
+		      ,@BatchLicenseDetails dbo.BatchSubconLicenses READONLY
+		      ,@FirstName nvarchar(100) 
+          ,@LastName nvarchar(100) 
+          ,@Mi nvarchar(2) 
+          ,@AvatarUrl nvarchar(255) = null
+		       --Location
+		      ,@LocationTypeId int out
+          ,@LineOne nvarchar(255) 
+          ,@LineTwo nvarchar(255) 
+          ,@City nvarchar(255) 
+          ,@Zip nvarchar(50) 
+          ,@StateId int 
+          ,@Latitude float 
+          ,@Longitude float       
+          ,@CreatedBy int
+		     --Subcontractors
+		      ,@Name nvarchar(100)
+		      ,@Phone nvarchar(20)
+		      ,@IndustryId int
+		      ,@SiteUrl nvarchar(255) = null
+		      ,@Id int OUTPUT
+
+/***********TEST CODE*************
+
+Declare @Id int, @UserProfileId int, @UserId int, 
+@BatchExpertise [dbo].[BatchSubcontractorExpertise],
+@BatchLicenseDetails dbo.BatchSubconLicenses
+
+Insert into @BatchExpertise (FieldExpertiseTypeId)
+values (3), (7)
+
+Insert into @BatchLicenseDetails (LicenseStateId, LicenseNumber, DateExpires)
+values (17, 'KWW-345', 'January 21, 2030'), (15, 'FLO-872', 'March 21, 2025')
+
+Execute dbo.Subcontractors_Insert_v5
+	    @BatchExpertise
+	   ,@BatchLicenseDetails
+	   ,@FirstName='Randy'
+     ,@LastName ='Marsh' 
+     ,@Mi ='H'
+     ,@AvatarUrl='https://southparkstudios.mtvnimages.com/shared/characters/adults/randy-marsh.png'
+	  --Insert into Location
+	   ,@LocationTypeId =1
+     ,@LineOne ='785 Colorado St'
+     ,@LineTwo ='Unit 4'
+     ,@City ='Denver'
+     ,@Zip ='58762'
+     ,@StateId = 10
+     ,@Latitude = 0.47
+     ,@Longitude  = 0.64
+     ,@CreatedBy  = 138
+    --Insert into Subcontractors
+	   ,@Name = 'Quality Cheering Services'
+     ,@Phone = '888-854-9999'
+     ,@IndustryId = 3
+     ,@SiteUrl = 'http://www.cheerforlife.org/'
+     ,@Id = @Id output
+
+SELECT * From dbo.Subcontractors
+
+SELECT * from dbo.Licenses
+
+SELECT * FROM dbo.SubcontractorLicenses
+
+*************************************/
+AS
+
+BEGIN
+
+	BEGIN TRY
+
+		BEGIN TRANSACTION
+
+			Declare @profileId int
+			Execute UserProfiles_Insert
+						  @createdBy
+					   ,@FirstName
+					   ,@LastName
+					   ,@Mi
+					   ,@AvatarUrl
+					   ,@profileId out
+
+			Declare @LocationId int   
+			Execute dbo.Locations_Insert
+						  @LocationTypeId 
+					   ,@LineOne 
+					   ,@LineTwo 
+					   ,@City 
+					   ,@Zip 
+					   ,@StateId 
+					   ,@Latitude 
+					   ,@Longitude         
+					   ,@CreatedBy
+					   ,@LocationId out
+			
+			Execute dbo.Subcontractors_Insert
+						@profileId
+					  ,@Name
+						,@LocationId
+						,@Phone
+						,@IndustryId
+						,@SiteUrl
+						,@Id OUTPUT
+
+			Execute dbo.SubcontractorExpertise_Insert_Batch
+					    @BatchExpertise
+						 ,@Id
+             ,@CreatedBy
+
+        
+			Execute dbo.Licenses_Insert_Batch_v2
+						  @BatchLicenseDetails
+					   ,@CreatedBy
+
+
+        Insert into dbo.SubcontractorLicenses ([SubcontractorId], [LicenseId], [CreatedBy])
+			  SELECT @Id, 
+			         LI.Id,
+					     @CreatedBy
+			  FROM dbo.Licenses as LI 
+			  WHERE EXISTS ( SELECT 1
+			                 FROM @BatchLicenseDetails AS BLD
+							         WHERE BLD.LicenseNumber = LI.LicenseNumber AND LI.CreatedBy = @CreatedBy)
+		
+		COMMIT TRANSACTION;
+
+	END TRY
+
+	BEGIN CATCH
+	    
+		IF @@TRANCOUNT > 0 ROLLBACK
+		DECLARE @MSG nvarchar(2048) = ERROR_MESSAGE()
+		RAISERROR (@MSG,16,1)
+
+	END CATCH
+
+
+END
