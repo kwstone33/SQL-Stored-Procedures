@@ -1,0 +1,101 @@
+ALTER proc [dbo].[Subcontractors_SelectPaginated_ByOrganizationId_v2]
+			@pageIndex int
+		   ,@pageSize int 
+		   ,@query nvarchar(100)
+		   
+AS
+
+/**********TEST***********
+
+DECLARE
+@pageIndex int = 0
+,@pageSize int = 10
+,@query nvarchar(100) = 'p'
+
+
+EXECUTE dbo.Subcontractors_SelectPaginated_ByOrganizationId_v2 @pageIndex, @pageSize, @query
+
+*************************/
+
+BEGIN
+
+DECLARE @offset int = @pageIndex * @pageSize
+
+SELECT S.[Id]
+      --,S.[UserProfileId]
+      ,S.[Name] as SubCompanyName
+      --,S.[LocationId]
+      ,S.[Phone]
+      ,S.[IndustryId]
+	  ,IT.[Name] as IndustryType
+      ,S.[SiteUrl]
+      ,S.[IsActive]
+      ,S.[DateCreated]
+      ,S.[DateModified]
+	  --,U.Id as UserId
+	  ,O.Id as OrganizationId
+	  ,O.[Name] as OrganizationName
+	  ,UP.Id
+	  ,UP.UserId
+	  ,UP.FirstName
+	  ,UP.LastName
+	  ,UP.Mi
+	  ,U.Email
+	  ,UP.AvatarUrl
+	  ,UP.DateCreated
+	  ,UP.DateModified
+	  
+
+	  ,L.Id
+	  ,L.LocationTypeId
+	  ,LT.Name as LocationType
+	  ,L.LineOne
+	  ,L.LineTwo
+	  ,L.City
+	  ,L.StateId
+	  ,ST.[Name] as [State]
+	  ,L.Zip
+	  ,L.Latitude
+	  ,L.Longitude
+	  
+	  ,(Select LT.[Name] as LicenseType
+			   ,L.LicenseNumber as LicenseNumber
+			   ,L.DateExpires
+			   ,ST.[Name] as StateName
+			   ,L.LicenseStateId
+			From dbo.SubcontractorLicenses as SL
+			join dbo.Subcontractors as SC on SC.Id = SL.SubcontractorId
+			join dbo.Licenses as L on L.Id = SL.LicenseId
+			join dbo.LicenseTypes as LT on LT.Id = L.LicenseTypeId
+			join dbo.States as ST on ST.Id = L.LicenseStateId
+			Where S.Id = SC.Id
+			For JSON Path) as Licenses
+	  ,(Select FE.[Name] as Expertise
+				,FE.Id as ExpertiseId
+			From dbo.SubcontractorExpertise as SE
+			join dbo.Subcontractors as SC on SC.Id = SE.SubcontractorId
+			join dbo.FieldExpertiseTypes as FE on SE.FieldExpertiseTypeId = FE.Id
+			Where S.Id = SC.Id
+			For JSON AUTO) as FieldExpertise
+	   ,TotalCount = COUNT(1) OVER()
+  
+  FROM [dbo].[Subcontractors] as S
+  join dbo.UserProfiles as UP on UP.Id = S.UserProfileId
+  join dbo.Users as U on U.Id = UP.UserId
+  join dbo.OrganizationSubcontractors as OS on OS.SubcontractorId = S.Id
+  join dbo.Organizations as O on O.Id = OS.OrganizationId
+  join dbo.Locations as L on L.Id = S.LocationId
+  left join dbo.LocationTypes as LT on LT.Id = L.LocationTypeId
+  join dbo.States as ST on ST.Id = L.StateId
+  join dbo.IndustryTypes as IT on IT.Id = S.IndustryId
+
+  WHERE (S.Name LIKE '%' + @query + '%' OR
+	     UP.FirstName LIKE '%' + @query + '%' OR
+		 UP.LastName LIKE '%' + @query + '%' OR
+		 U.Email LIKE '%' + @query + '%')
+
+  ORDER BY O.Id
+  OFFSET @offset ROWS
+  FETCH NEXT @pageSize ROWS ONLY
+
+END
