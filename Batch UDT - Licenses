@@ -1,0 +1,6 @@
+CREATE TYPE [dbo].[BatchSubconLicenses] AS TABLE(
+	[LicenseStateId] [int] NOT NULL,
+	[LicenseNumber] [varchar](50) NOT NULL,
+	[DateExpires] [date] NULL
+)
+GO
