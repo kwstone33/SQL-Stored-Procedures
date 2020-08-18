@@ -1,0 +1,87 @@
+ALTER proc [dbo].[Subcontractors_SelectById_Details_v3]
+			@EntityId int
+AS
+
+/**********TEST***********
+
+DECLARE 
+@Id int = 302
+
+EXECUTE dbo.Subcontractors_SelectById_Details_v3 @Id
+
+*************************/
+
+BEGIN
+
+SELECT S.[Id]
+      --,S.[UserProfileId]
+      ,S.[Name] as SubCompanyName
+      --,S.[LocationId]
+      ,S.[Phone]
+      ,S.[IndustryId]
+	  ,IT.[Name] as IndustryType
+      ,S.[SiteUrl]
+      ,S.[IsActive]
+      ,S.[DateCreated]
+      ,S.[DateModified]
+	  --,U.Id as UserId
+	  ,O.Id as OrganizationId
+	  ,O.[Name] as OrganizationName
+	  ,UP.Id
+	  ,UP.UserId
+	  ,UP.FirstName
+	  ,UP.LastName
+	  ,UP.Mi
+	  ,U.Email
+	  ,UP.AvatarUrl
+	  ,UP.DateCreated
+	  ,UP.DateModified
+	  ,L.Id
+	  ,L.LocationTypeId
+	  ,LT.Name as LocationType
+	  ,L.LineOne
+	  ,L.LineTwo
+	  ,L.City
+	  ,L.StateId
+	  ,ST.[Name] as [State]
+	  ,L.Zip
+	  ,L.Latitude
+	  ,L.Longitude
+	  
+	  ,(Select LT.[Name] as LicenseType
+			   ,L.LicenseNumber as LicenseNumber
+			   ,L.DateExpires
+			   ,ST.[Name] as StateName
+			   --added below
+			   ,L.LicenseStateId
+			From dbo.SubcontractorLicenses as SL
+			join dbo.Subcontractors as SC on SC.Id = SL.SubcontractorId
+			join dbo.Licenses as L on L.Id = SL.LicenseId
+			join dbo.LicenseTypes as LT on LT.Id = L.LicenseTypeId
+			join dbo.States as ST on ST.Id = L.LicenseStateId
+			Where S.Id = SC.Id
+			For JSON PATH) as Licenses
+      
+	   ,(Select FE.[Name] as Expertise
+				--added this below to test
+				,FE.Id as ExpertiseId
+			From dbo.SubcontractorExpertise as SE
+			join dbo.Subcontractors as SC on SC.Id = SE.SubcontractorId
+			join dbo.FieldExpertiseTypes as FE on SE.FieldExpertiseTypeId = FE.Id
+			Where S.Id = SC.Id
+			For JSON PATH) as FieldExpertise
+  
+  FROM [dbo].[Subcontractors] as S
+  left join dbo.UserProfiles as UP on UP.Id = S.UserProfileId
+  left join dbo.Users as U on U.Id = UP.UserId
+  left join dbo.OrganizationSubcontractors as OS on OS.SubcontractorId = S.Id
+  left join dbo.Organizations as O on O.Id = OS.OrganizationId
+  left join dbo.Locations as L on L.Id = S.LocationId
+  left join dbo.LocationTypes as LT on LT.Id = L.LocationTypeId
+  left join dbo.States as ST on ST.Id = L.StateId
+  left join dbo.IndustryTypes as IT on IT.Id = S.IndustryId
+  
+
+  WHERE S.UserProfileId = @EntityId
+
+END
