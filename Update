@@ -1,0 +1,156 @@
+ALTER PROC [dbo].[Subcontractors_Update_v3]
+		@BatchExpertise dbo.BatchSubcontractorExpertise READONLY
+		,@BatchLicenseDetails dbo.BatchSubconLicenses READONLY
+		,@UserId int
+		,@UserProfileId int
+		--User Profile
+		,@FirstName nvarchar(100) 
+        ,@LastName nvarchar(100) 
+        ,@Mi nvarchar(2) 
+        ,@AvatarUrl nvarchar(255) = null
+		--,@ModifiedBy int --> is the UserId
+		--Locations
+		,@LocationId int 
+		,@LocationTypeId int out
+        ,@LineOne nvarchar(255) 
+        ,@LineTwo nvarchar(255) 
+        ,@City nvarchar(255) 
+        ,@Zip nvarchar(50) 
+        ,@StateId int 
+        ,@Latitude float 
+        ,@Longitude float    
+		--Subcontractors
+		,@Name nvarchar(100)
+		--,@LocationId int
+		,@Phone nvarchar(20)
+		,@IndustryId int
+		,@SiteUrl nvarchar(255) = null
+		,@IsActive bit 
+		,@Id int
+
+
+/***********TEST 2***************
+
+Execute dbo.Subcontractors_SelectById_Details_v2 @Id = 33
+
+Declare
+@BatchExpertise [dbo].[BatchSubcontractorExpertise],
+@BatchLicenseDetails dbo.BatchSubconLicenses
+
+Insert into @BatchExpertise (FieldExpertiseTypeId)
+values (4), (5)
+
+Insert into @BatchLicenseDetails (LicenseStateId, LicenseNumber, DateExpires)
+values (17, 'JJJ-222', 'January 21, 2030'), (15, 'KKK-444', 'March 21, 2025')
+
+
+EXECUTE dbo.Subcontractors_Update_v3
+	 @BatchExpertise
+	,@BatchLicenseDetails
+	,@UserId = 68
+	,@UserProfileId = 122
+	,@FirstName = 'Jason'
+    ,@LastName = 'McDougall'
+    ,@Mi = 'J'
+    ,@AvatarUrl = 'https://images-na.ssl-images-amazon.com/images/I/8107ZHxtRYL._SL1425_.jpg'
+	,@LocationId = 189
+	,@LocationTypeId = 1
+    ,@LineOne = '1325 Frosty Way'
+    ,@LineTwo = 'Unit 27'
+    ,@City = 'Tampa'
+    ,@Zip = '58762'
+    ,@StateId = 8
+    ,@Latitude = 0.45
+    ,@Longitude = 0.88
+	,@Name = 'Happy Fix'
+	,@Phone = '888-222-3000'
+	,@IndustryId = 2
+	,@SiteUrl = 'https://www.git.com'
+	,@IsActive = 1
+	,@Id = 33
+
+Execute dbo.Subcontractors_SelectById_Details_v2 @Id = 33
+
+****************************/
+
+
+
+as
+
+BEGIN
+
+	BEGIN TRY
+
+			BEGIN TRANSACTION
+		
+				Execute dbo.UserProfiles_Update 
+								@UserProfileId
+							   ,@UserId 
+							   ,@FirstName
+							   ,@LastName 
+							   ,@Mi
+							   ,@AvatarUrl
+							   --,@ModifiedBy
+							   ,@UserId
+							   
+				Execute dbo.Locations_Update
+								@LocationTypeId 
+							   ,@LineOne 
+							   ,@LineTwo 
+							   ,@City 
+							   ,@Zip 
+							   ,@StateId 
+							   ,@Latitude 
+							   ,@Longitude            
+							   --,@ModifiedBy
+							   ,@UserId
+							   ,@LocationId
+
+				EXECUTE dbo.Subcontractors_Update 
+							   @UserProfileId
+							   ,@Name
+							   ,@LocationId
+							   ,@Phone
+							   ,@IndustryId
+							   ,@SiteUrl
+							   ,@IsActive
+							   ,@Id
+				
+				
+				Execute dbo.SubcontractorExpertise_Update_Batch
+					    @BatchExpertise
+						,@Id
+                        ,@UserId
+
+
+				DELETE FROM [dbo].[SubcontractorLicenses]
+				  WHERE SubcontractorId = @Id
+
+				DELETE From dbo.Licenses WHERE CreatedBy = @UserId
+
+				Execute dbo.Licenses_Insert_Batch_v2
+						@BatchLicenseDetails
+					   ,@UserId
+			
+				Insert into dbo.SubcontractorLicenses ([SubcontractorId], [LicenseId], [CreatedBy])
+				  SELECT @Id, 
+						 LI.Id,
+						 @UserId
+				  FROM dbo.Licenses as LI 
+				  WHERE EXISTS ( SELECT 1
+								 FROM @BatchLicenseDetails AS BLD
+								 WHERE BLD.LicenseNumber = LI.LicenseNumber AND LI.CreatedBy = @UserId)
+
+
+			COMMIT TRANSACTION
+	END TRY
+
+	BEGIN CATCH
+	    
+		IF @@TRANCOUNT > 0 ROLLBACK
+		DECLARE @MSG nvarchar(2048) = ERROR_MESSAGE()
+		RAISERROR (@MSG,16,1)
+
+	END CATCH
+
+END
