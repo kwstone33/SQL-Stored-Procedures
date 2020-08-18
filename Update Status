@@ -1,0 +1,31 @@
+ALTER PROC [dbo].[Subcontractors_Update_Status]
+		 @IsActive bit
+		,@Id int
+/*
+
+DECLARE @Id int = 13
+
+DECLARE
+	 @IsActive bit = 0
+
+EXECUTE dbo.Subcontractors_Update_Status 
+	 @IsActive
+	,@Id
+
+
+Select * from dbo.Subcontractors WHERE Id = @Id
+*/
+
+
+as
+
+BEGIN
+
+	DECLARE @DateModified datetime2(7) = GETUTCDATE()
+
+	UPDATE [dbo].[Subcontractors]
+	SET  [IsActive] = 0
+		,[DateModified] = @DateModified
+	WHERE id = @Id
+
+END
